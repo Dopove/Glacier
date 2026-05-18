@@ -1,0 +1,36 @@
+# Environments
+.venv/
+.venv_real/
+.vscode/
+
+# Logs
+*.log
+*.txt
+logs/
+logs_latest/
+logs3/
+logs4/
+logs5/
+logs6/
+
+# Python
+__pycache__/
+*.pyc
+*.pyd
+*.so
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.idea/
+.DS_Store
+
+# Proprietary / Sensitive Folders
+ICE/
+Glacier_Release_Staging/
+plan/
+idea/
+output.md
+ice-output.md

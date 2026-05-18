@@ -1,0 +1,20 @@
+# GLACIER / ICE-Lite Dependencies
+# Core ML & Inference
+torch>=2.0.0
+transformers>=4.38.0
+
+# Memory & Embeddings
+numpy>=1.24.0
+onnxruntime>=1.15.0
+tokenizers>=0.13.3
+sentencepiece
+tiktoken
+
+# Networking & Utilities
+httpx>=0.24.0
+tqdm>=4.65.0
+
+# For Benchmarking
+matplotlib>=3.8.0
+pytest
+pytest-asyncio

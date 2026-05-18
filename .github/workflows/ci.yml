@@ -1,0 +1,78 @@
+name: GLACIER - CI Build & Test (Monolithic CUDA)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  build_and_test:
+    name: Py ${{ matrix.python-version }} / CUDA ${{ matrix.cuda-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10"] # Start with one Python version for stability
+        cuda-version: ["11-8", "12-1"] # Attempt X-Y format for Jimver/cuda-toolkit
+        pytorch-version: ["2.2.2"] # A stable PyTorch version
+        include:
+          - cuda-version: "11-8"
+            torch-cuda-suffix: "cu118"
+          - cuda-version: "12-1"
+            torch-cuda-suffix: "cu121"
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install System Build Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libssl-dev
+
+    - name: Set up CUDA ${{ matrix.cuda-version }}
+      uses: Jimver/cuda-toolkit@v0.2.16
+      with:
+        cuda: ${{ matrix.cuda-version }} # Pass the corrected full version
+
+    - name: Install PyTorch and build tools
+      run: |
+        python -m pip install --upgrade pip
+        # Install PyTorch for the specific CUDA version
+        pip install torch==${{ matrix.pytorch-version }}+${{ matrix.torch-cuda-suffix }} --index-url https://download.pytorch.org/whl/${{ matrix.torch-cuda-suffix }}
+        # Install remaining build dependencies needed by setup.py
+        pip install packaging ninja wheel pytest
+
+    - name: Verify Environment
+      run: |
+        echo "--- Python Version ---"
+        python --version
+        echo "--- NVCC Version ---"
+        nvcc -V || echo "NVCC not found" # Handle potential non-existent nvcc for debugging
+        echo "--- Torch Version ---"
+        python -c "import torch; print(torch.__version__); print('CUDA Available:', torch.cuda.is_available()); print('CUDA Version:', torch.version.cuda)" || echo "Torch not found"
+
+    - name: Install Glacier Package from Source
+      env:
+        # Force mamba to build its extensions from source
+        MAMBA_FORCE_BUILD: "TRUE"
+        # Ensure we attempt CUDA build
+        MAMBA_SKIP_CUDA_BUILD: "FALSE" 
+        # Target a broad range of architectures to maximize compatibility on GHA
+        TORCH_CUDA_ARCH_LIST: "7.0 7.5 8.0 8.6 8.9 9.0"
+        # Increase compilation parallelism
+        MAX_JOBS: "4" 
+      run: |
+        pip install -v -e .
+
+    - name: Run all Tests
+      run: |
+        pytest test_glacier.py
+        pytest test_agentic_features.py

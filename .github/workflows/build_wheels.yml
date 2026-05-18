@@ -1,0 +1,181 @@
+name: GLACIER - Comprehensive Wheel Builds
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Git tag to build from (e.g., v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  build_wheels:
+    name: Build wheels (${{ matrix.os }}/${{ matrix.arch }} / Py ${{ matrix.python_version }} / CUDA ${{ matrix.cuda_label }})
+    
+    defaults:
+      run:
+        working-directory: ./Glacier_Release_Staging # All steps run from here
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: ['3.10', '3.11', '3.12']
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        arch: [x64] # Default to x64. Add 'arm64' later for specific runners.
+        cuda_label: [cu11, cu12]
+        
+        include:
+          # macOS ARM64 builds (explicitly defined)
+          - os: macos-14
+            arch: arm64
+            python_version: '3.10'
+            cuda_label: 'cpu' # macOS is CPU only
+          - os: macos-14
+            arch: arm64
+            python_version: '3.11'
+            cuda_label: 'cpu'
+          - os: macos-14
+            arch: arm64
+            python_version: '3.12'
+            cuda_label: 'cpu'
+
+        exclude:
+          # macOS does not have CUDA. All macOS builds are CPU-only variants.
+          - os: macos-latest
+            cuda_label: cu11
+          - os: macos-latest
+            cuda_label: cu12
+          - os: macos-14
+            cuda_label: cu11
+          - os: macos-14
+            cuda_label: cu12
+          
+          # Exclude x64 + cpu-alt as that's covered by x64 + cu11/cu12
+          - arch: x64
+            cuda_label: cpu
+          - arch: x64
+            cuda_label: cpu-alt
+
+
+    runs-on: ${{ (matrix.os == 'ubuntu-latest' && matrix.arch == 'x64' && 'ubuntu-latest') ||
+                 (matrix.os == 'ubuntu-latest' && matrix.arch == 'arm64' && 'self-hosted,linux,arm64') ||
+                 (matrix.os == 'windows-latest' && matrix.arch == 'x64' && 'windows-latest') ||
+                 (matrix.os == 'windows-latest' && matrix.arch == 'arm64' && 'self-hosted,windows,arm64') ||
+                 (matrix.os == 'macos-latest' && matrix.arch == 'x64' && 'macos-latest') ||
+                 (matrix.os == 'macos-14' && matrix.arch == 'arm64' && 'macos-14-arm64') }}
+    
+    steps:
+      - name: Checkout repository and submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive' # Initialize and update submodules
+
+      - name: Set up Python ${{ matrix.python_version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python_version }}
+          architecture: ${{ matrix.arch }}
+          cache: 'pip'
+          cache-dependency-path: 'Glacier_Release_Staging/requirements.txt' # requirements.txt is in the submodule
+
+      - name: Install System Build Dependencies (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          brew install gettext cmake
+          echo "CPPFLAGS=-I$(brew --prefix gettext)/include" >> $GITHUB_ENV
+          echo "LDFLAGS=-L$(brew --prefix gettext)/lib" >> $GITHUB_ENV
+          echo "PATH=$(brew --prefix gettext)/bin:$PATH" >> $GITHUB_ENV
+
+      - name: Install System Build Dependencies (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: sudo apt-get update && sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev g++-12
+
+      - name: Install System Build Dependencies (Windows)
+        if: startsWith(matrix.os, 'windows')
+        run: |
+          echo "Windows build environment setup"
+
+      - name: Setup CUDA Toolkit (Linux & Windows x64)
+        if: (startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'windows')) && matrix.arch == 'x64' && (matrix.cuda_label == 'cu11' || matrix.cuda_label == 'cu12')
+        uses: jimver/cuda-toolkit@v0.2.16
+        with:
+          cuda: ${{ matrix.cuda_label == 'cu11' && '11.8.0' || '12.1.1' }}
+        continue-on-error: true # Correct placement of continue-on-error
+
+      - name: Set Environment Variables for Build
+        id: set_build_vars
+        run: |
+          echo "MAMBA_FORCE_BUILD=TRUE" >> "$GITHUB_ENV"
+          if [ "${{ matrix.cuda_label }}" == "cu11" ]; then
+            echo "PYTORCH_CUDA_VERSION_STRING=cu118" >> "$GITHUB_ENV"
+            echo "MAMBA_CPU_BUILD=FALSE" >> "$GITHUB_ENV" # Ensure CUDA is built
+          elif [ "${{ matrix.cuda_label }}" == "cu12" ]; then
+            echo "PYTORCH_CUDA_VERSION_STRING=cu121" >> "$GITHUB_ENV"
+            echo "MAMBA_CPU_BUILD=FALSE" >> "$GITHUB_ENV" # Ensure CUDA is built
+          else # CPU-only builds (macos and ARM64)
+            echo "PYTORCH_CUDA_VERSION_STRING=" >> "$GITHUB_ENV"
+            echo "MAMBA_CPU_BUILD=TRUE" >> "$GITHUB_ENV"
+          fi
+          echo "NVCC_FLAGS=-std=c++17" >> "$GITHUB_ENV"
+
+      - name: Install PyTorch and Dependencies
+        run: |
+          pip install --upgrade pip wheel ninja packaging
+          if [ "${{ env.MAMBA_CPU_BUILD }}" == "TRUE" ]; then
+            pip install torch torchvision torchaudio
+          else
+            pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/${{ env.PYTORCH_CUDA_VERSION_STRING }}
+          fi
+          pip install -r Glacier_Release_Staging/requirements.txt # Adjusted path
+
+      - name: Build and Install Mamba and Causal-Conv1D
+        run: |
+          pip install ./Glacier_Release_Staging/causal-conv1d --no-build-isolation --verbose
+          pip install ./Glacier_Release_Staging/mamba-2.3.2.post1 --no-build-isolation --verbose
+
+      - name: Build GLACIER Wheel
+        run: python Glacier_Release_Staging/setup.py bdist_wheel
+
+      - name: Store Wheel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: glacier-wheel-${{ matrix.os }}-${{ matrix.arch }}-py${{ matrix.python_version }}-${{ matrix.cuda_label || 'cpu' }}
+          path: Glacier_Release_Staging/dist/*.whl
+
+  release_wheels:
+    name: Publish Release
+    needs: build_wheels
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' && github.event.action == 'published' || github.event.inputs.tag != ''
+
+    steps:
+      - name: Download all workflow artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-wheels
+
+      - name: Create Release (if triggered by dispatch)
+        id: create_release
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.tag != ''
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          name: Release ${{ github.event.inputs.tag }}
+          body: |
+            GLACIER comprehensive wheel builds for ${{ github.event.inputs.tag }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release Assets
+        run: |
+          find all-wheels -type f -name '*.whl' -print0 | xargs -0 -I {} gh release upload ${{ github.event.inputs.tag || github.ref_name }} {} --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash

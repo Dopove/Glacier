@@ -1,0 +1,8 @@
+This file contains internal planning and strategic discussions for the GLACIER project. It covers topics such as:
+
+- Open source strategy and positioning for ICE-Lite.
+- Competitive analysis against other LLM architectures.
+- Monetization strategies through open source engagement.
+- Selection of base architectures (e.g., Mamba, RWKV) for building prototypes.
+
+This document serves as a high-level overview of the thought process behind the GLACIER project's development and release.

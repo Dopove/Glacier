@@ -1,0 +1,52 @@
+name: GLACIER - Real Model Benchmark CI (Final Fix)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  real_model_test:
+    name: Run Full Benchmark on Real Mamba Model
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Set up CUDA 12.1
+      uses: Jimver/cuda-toolkit@v0.2.16
+      with:
+        cuda: '12.1.1'
+        
+    - name: Install Compatible GCC/G++
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc-12 g++-12
+        
+    - name: Install PyTorch and Build Tools
+      env:
+        CC: /usr/bin/gcc-12
+        CXX: /usr/bin/g++-12
+      run: |
+        python -m pip install --upgrade pip
+        pip install torch==2.3.0+cu121 --index-url https://download.pytorch.org/whl/cu121
+        pip install packaging ninja wheel setuptools pytest pytest-asyncio sentencepiece tiktoken transformers httpx numpy onnxruntime tokenizers
+
+    - name: Build and Install Mamba from Source
+      env:
+        CC: /usr/bin/gcc-12
+        CXX: /usr/bin/g++-12
+        MAMBA_FORCE_BUILD: "TRUE"
+      run: |
+        pip install --no-build-isolation -r Glacier_Release_Staging/requirements.txt
+
+    - name: Run All Tests with Real Models
+      env:
+        MAMBA_FORCE_REAL: "true"
+      run: |
+        pytest Glacier_Release_Staging/test_glacier.py
+        pytest Glacier_Release_Staging/test_agentic_features.py
