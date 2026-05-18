@@ -34,4 +34,4 @@ RUN pip install --no-build-isolation -r requirements.txt
 COPY . .
 
 # Set default command to run the benchmark script
-CMD ["python", "test_glacier.py"]
+CMD ["python", "tests/test_glacier.py"]

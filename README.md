@@ -73,22 +73,24 @@ wget https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model_quan
 wget https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/tokenizer.json -O ~/.cache/ice/models/tokenizer.json
 
 # 4. Run the full benchmark suite
-python test_glacier.py
+python tests/test_glacier.py
 ```
 </details>
 
 ### Deploying to HuggingFace Spaces
-You can deploy the interactive Gradio demo (`app.py`) to HuggingFace Spaces in minutes. See the [Getting Started guide](./docs/getting_started.md) for more details.
+You can deploy the interactive Gradio demo (`examples/app.py`) to HuggingFace Spaces in minutes. See the [Getting Started guide](./docs/getting_started.md) for more details.
 
 ## Project Structure
 ```text
 /
-├── ice_lite/             # The core ICE-Lite Python package
-├── mamba_ssm/            # Mamba2 source (from state-spaces/mamba)
+├── src/ice_lite/         # The core ICE-Lite Python package
+├── vendor/mamba_ssm/     # Mamba2 source (from state-spaces/mamba)
 ├── temporal_rag.py       # The Temporal-RAG source (by Emmimal P Alexander)
-├── test_glacier.py       # The full GLACIER benchmark test suite
-├── test_agentic_features.py # Tests for tool use, stitching, and ingestion
-├── app.py                # Gradio demo for HuggingFace Spaces
+├── tests/                # Test suites
+│   ├── test_glacier.py   # The full GLACIER benchmark test suite
+│   └── test_agentic_features.py # Tests for tool use, stitching, and ingestion
+├── examples/             # Demos and examples
+│   └── app.py            # Gradio demo for HuggingFace Spaces
 ├── docs/                 # All project documentation
 ├── setup.py              # Packaging script for the `glacier` package
 ├── requirements.txt
