@@ -4,6 +4,8 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   
 on:
+  push:
+    branches: [ main ]
   release:
     types: [published]
   workflow_dispatch:
@@ -17,9 +19,9 @@ jobs:
   build_wheels:
     name: Build wheels (${{ matrix.os }}/${{ matrix.arch }} / Py ${{ matrix.python_version }} / CUDA ${{ matrix.cuda_label }})
     
-    defaults:
-      run:
-        working-directory: ./Glacier_Release_Staging # All steps run from here
+    # defaults:
+    #   run:
+    #     working-directory: ./ # Root directory
 
     strategy:
       fail-fast: false
@@ -81,7 +83,7 @@ jobs:
           python-version: ${{ matrix.python_version }}
           architecture: ${{ matrix.arch }}
           cache: 'pip'
-          cache-dependency-path: 'Glacier_Release_Staging/requirements.txt' # requirements.txt is in the submodule
+          cache-dependency-path: 'requirements.txt'
 
       - name: Install System Build Dependencies (macOS)
         if: startsWith(matrix.os, 'macos')
@@ -131,27 +133,28 @@ jobs:
           else
             pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/${{ env.PYTORCH_CUDA_VERSION_STRING }}
           fi
-          pip install -r Glacier_Release_Staging/requirements.txt # Adjusted path
+          pip install -r requirements.txt
 
       - name: Build and Install Mamba and Causal-Conv1D
         run: |
-          pip install ./Glacier_Release_Staging/causal-conv1d --no-build-isolation --verbose
-          pip install ./Glacier_Release_Staging/mamba-2.3.2.post1 --no-build-isolation --verbose
+          pip install ./causal-conv1d --no-build-isolation --verbose
+          pip install ./vendor/mamba_ssm --no-build-isolation --verbose
 
       - name: Build GLACIER Wheel
-        run: python Glacier_Release_Staging/setup.py bdist_wheel
+        run: python setup.py bdist_wheel
 
       - name: Store Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
           name: glacier-wheel-${{ matrix.os }}-${{ matrix.arch }}-py${{ matrix.python_version }}-${{ matrix.cuda_label || 'cpu' }}
-          path: Glacier_Release_Staging/dist/*.whl
+          path: dist/*.whl
 
   release_wheels:
     name: Publish Release
     needs: build_wheels
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' && github.event.action == 'published' || github.event.inputs.tag != ''
+    if: (github.event_name == 'release' && github.event.action == 'published') || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '')
+
 
     steps:
       - name: Download all workflow artifacts

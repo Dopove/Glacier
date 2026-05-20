@@ -9,6 +9,16 @@ This project was architected and built by **Saran S**, Founder & CEO of Dopove.
 
 ---
 
+## 🚀 Quick Installation (v0.1.0)
+
+For a fast setup on Linux with CUDA, you can install the pre-built `glacier-ice-lite` wheel directly:
+
+```bash
+pip install https://github.com/Dopove/Glacier/releases/download/v0.1.0/glacier_ice_lite-0.1.0-py3-none-any.whl
+```
+
+---
+
 ## Key Features
 
 *   **Persistent Memory:** Stop and restart sessions with full memory recall.
