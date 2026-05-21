@@ -1,0 +1,6 @@
+[submodule "causal-conv1d"]
+	path = causal-conv1d
+	url = https://github.com/Dao-AILab/causal-conv1d.git
+[submodule "vendor/mamba_ssm"]
+	path = vendor/mamba_ssm
+	url = https://github.com/state-spaces/mamba.git
