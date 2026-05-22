@@ -76,15 +76,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: 'recursive' # Initialize and update submodules
+          token: ${{ secrets.GH_TOKEN }} # Use a token with submodule access
 
       - name: Set up Python ${{ matrix.python_version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python_version }}
           architecture: ${{ matrix.arch }}
-          cache: 'pip'
-          cache-dependency-path: 'requirements.txt'
-
       - name: Install System Build Dependencies (macOS)
         if: startsWith(matrix.os, 'macos')
         run: |
